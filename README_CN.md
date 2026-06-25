@@ -1,6 +1,6 @@
 # 嵌入式 Camera 与 Firmware Demo
 
-公开作品集，展示 Embedded Linux、V4L2、Android Camera HAL/App、USB/UVC 和固件能力，不包含公司源码或商业 Sensor 寄存器表。
+展示 Embedded Linux、V4L2、Android Camera HAL/App、USB/UVC 和固件能力。
 
 ## Driver / HAL / App 三层 Demo
 
