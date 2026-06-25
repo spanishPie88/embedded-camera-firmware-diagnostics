@@ -1,0 +1,18 @@
+Media controller API version 6.1.0
+
+Device topology
+---------------
+- entity 1: demo-sensor 1-0036 (1 pad, 1 link)
+    pad0: Source [fmt:SRGGB10_1X10/1920x1080 field:none]
+        -> "rkisp1-csi":0 []
+
+- entity 2: rkisp1-csi (2 pads, 2 links)
+    pad0: Sink [fmt:SRGGB10_1X10/1280x720 field:none]
+        <- "demo-sensor 1-0036":0 []
+    pad1: Source [fmt:SRGGB10_1X10/1920x1080 field:none]
+        -> "rkisp1-isp-subdev":0 [ENABLED]
+
+- entity 3: rkisp1-isp-subdev (1 pad, 1 link)
+    pad0: Sink [fmt:SRGGB10_1X10/1280x720 field:none]
+        <- "rkisp1-csi":1 [ENABLED]
+

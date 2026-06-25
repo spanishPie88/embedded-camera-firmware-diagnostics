@@ -1,0 +1,29 @@
+Media controller API version 6.1.0
+
+Media device information
+------------------------
+driver          rkisp1
+model           rkisp1
+
+Device topology
+---------------
+- entity 1: demo-sensor 1-0036 (1 pad, 1 link)
+    pad0: Source [fmt:SRGGB10_1X10/1920x1080 field:none]
+        -> "rkisp1-csi":0 [ENABLED,IMMUTABLE]
+
+- entity 2: rkisp1-csi (2 pads, 2 links)
+    pad0: Sink [fmt:SRGGB10_1X10/1920x1080 field:none]
+        <- "demo-sensor 1-0036":0 [ENABLED,IMMUTABLE]
+    pad1: Source [fmt:SRGGB10_1X10/1920x1080 field:none]
+        -> "rkisp1-isp-subdev":0 [ENABLED]
+
+- entity 3: rkisp1-isp-subdev (2 pads, 2 links)
+    pad0: Sink [fmt:SRGGB10_1X10/1920x1080 field:none]
+        <- "rkisp1-csi":1 [ENABLED]
+    pad1: Source [fmt:YUYV8_2X8/1920x1080 field:none]
+        -> "rkisp1_mainpath":0 [ENABLED]
+
+- entity 4: rkisp1_mainpath (1 pad, 1 link)
+    pad0: Sink [fmt:YUYV8_2X8/1920x1080 field:none]
+        <- "rkisp1-isp-subdev":1 [ENABLED]
+
