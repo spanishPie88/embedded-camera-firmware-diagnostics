@@ -1,36 +1,51 @@
 # Embedded Camera & Firmware Diagnostics Lab
 
 Public, vendor-neutral demos for embedded Linux camera, USB/UVC, V4L2 media
-pipelines, and safe firmware-upgrade engineering.
+pipelines, Android Camera HAL/App integration, and safe firmware upgrades.
 
-This repository is designed as a technical portfolio: every demo is small
-enough to review quickly, but represents a real task that appears in camera,
-driver, BSP, and firmware projects.
+## Featured Driver / HAL / App camera stack
 
-## Demo catalog
+| Layer | Demo | Capability shown |
+|---|---|---|
+| Linux Driver | [`demos/driver-v4l2-sensor`](demos/driver-v4l2-sensor) | I2C/regmap, runtime PM, V4L2 controls, RAW10 format and stream lifecycle |
+| Android HAL | [`demos/hal3-camera-pipeline`](demos/hal3-camera-pipeline) | Stream validation, capture requests, buffer ownership, results, flush/errors |
+| Android App | [`demos/android-camera2-jni-app`](demos/android-camera2-jni-app) | Camera2 lifecycle, preview + YUV analysis, ImageReader back pressure and JNI/C++ |
+
+```text
+Android Camera2 App
+       |
+       v
+Camera HAL3 request and buffer pipeline
+       |
+       v
+V4L2 / media-controller / ISP
+       |
+       v
+I2C image sensor driver + MIPI CSI-2
+```
+
+The examples are intentionally vendor-neutral. They demonstrate engineering
+structure and boundary handling without publishing customer source code or
+pretending that fictional registers support a real sensor.
+
+## Supporting diagnostic demos
 
 | Demo | Engineering question | Main skills |
 |---|---|---|
-| [1. Diagnostic collector](#1-uvcv4l2-diagnostic-collector) | What evidence should be collected before changing a driver? | Linux, V4L2, USB, shell |
-| [2. Diagnostic redactor](#2-diagnostic-redactor) | How can logs be shared without leaking common identifiers? | Python, privacy, support workflow |
-| [3. UVC bandwidth planner](#3-uvc-bandwidth-planner) | Can a requested video mode fit the selected USB link? | UVC, formats, bandwidth analysis |
-| [4. V4L2 topology auditor](#4-v4l2-media-topology-auditor) | Are required media links enabled and formats consistent? | V4L2, media controller, ISP pipeline |
-| [5. A/B firmware simulator](#5-ab-firmware-upgrade-simulator) | What happens if power is lost or a trial image fails? | Bootloader, flash, integrity, rollback |
+| Diagnostic collector | What evidence should be collected before changing a driver? | Linux, V4L2, USB, shell |
+| Diagnostic redactor | How can logs be shared without leaking common identifiers? | Python, privacy, support workflow |
+| UVC bandwidth planner | Can a requested video mode fit the selected USB link? | UVC, formats, bandwidth analysis |
+| V4L2 topology auditor | Are required media links enabled and formats consistent? | V4L2, media controller, ISP pipeline |
+| A/B firmware simulator | What happens if power is lost or a trial image fails? | Bootloader, flash, integrity, rollback |
 
-All Python tools use only the standard library.
-
-## Quick start
+## Quick examples
 
 ```bash
-python -m unittest discover -s tests -v
-
 python tools/uvc_bandwidth.py \
   --width 3840 --height 2160 --fps 30 --format YUY2 --usb usb3
 
-python tools/v4l2_topology_audit.py \
-  examples/media-ctl-rkisp-good.txt
-
-python tools/firmware_ab_simulator.py demo
+python tools/v4l2_topology_audit.py examples/media-ctl-rkisp-good.txt
+python tools/firmware_ab_simulator.py demo --fail-after-chunk 2
 ```
 
 On a Linux camera target:
@@ -38,129 +53,62 @@ On a Linux camera target:
 ```bash
 chmod +x scripts/collect_uvc_diagnostics.sh
 ./scripts/collect_uvc_diagnostics.sh /dev/video0
-
-python tools/redact_diagnostics.py \
-  uvc-diagnostics-YYYYMMDD-HHMMSS \
-  uvc-diagnostics-redacted
+python tools/redact_diagnostics.py input-diagnostics output-redacted
 ```
 
-## 1. UVC/V4L2 diagnostic collector
+## Diagnostic collector
 
 [`scripts/collect_uvc_diagnostics.sh`](scripts/collect_uvc_diagnostics.sh)
-collects a read-only evidence bundle:
+collects kernel/OS information, V4L2 capabilities and controls, USB topology,
+media-controller topology, relevant kernel messages and SHA-256 checksums.
+It is read-only and does not change controls or flash firmware.
 
-- kernel and operating-system version;
-- V4L2 capabilities, controls, formats, sizes, and frame intervals;
-- USB topology and descriptors when available;
-- media-controller topology;
-- relevant kernel messages;
-- SHA-256 checksums for bundle integrity.
-
-It intentionally does not change controls, flash firmware, or start a long
-stream. Run it once on a known-good setup and once on the failing setup before
-comparing driver behavior.
-
-## 2. Diagnostic redactor
-
-[`tools/redact_diagnostics.py`](tools/redact_diagnostics.py) copies a diagnostic
-directory while masking common IPv4 addresses, MAC addresses, email addresses,
-USB serial fields, Linux home paths, and Windows user paths.
-
-Redaction is a review aid, not a security guarantee. The generated
-`redaction-report.json` lists how many replacements were made in each file so
-an engineer can perform a final manual review.
-
-## 3. UVC bandwidth planner
+## UVC bandwidth planner
 
 [`tools/uvc_bandwidth.py`](tools/uvc_bandwidth.py) estimates active-video
-payload for YUY2, UYVY, NV12, RGB24, GREY, and MJPEG modes, then compares that
-payload with a deliberately conservative USB payload budget.
+payload for YUY2, UYVY, NV12, RGB24, GREY and MJPEG, then compares it with a
+conservative USB payload budget. Real feasibility still depends on endpoint
+descriptors, transfer type, host scheduling, UVC headers and shared traffic.
 
-Example:
+## V4L2 media topology auditor
 
-```bash
-python tools/uvc_bandwidth.py \
-  --width 1920 --height 1080 --fps 30 \
-  --format MJPEG --compression-ratio 8 --usb usb2
-```
+[`tools/v4l2_topology_audit.py`](tools/v4l2_topology_audit.py) checks parsed
+`media-ctl -p` output for missing enabled links and conflicting source/sink
+formats. Synthetic RKISP-style good and broken examples are included.
 
-The result is an engineering estimate, not a USB scheduler. Real feasibility
-still depends on endpoint descriptors, transfer type, host controller,
-microframe allocation, UVC headers, other devices, and implementation quality.
+## A/B firmware upgrade simulator
 
-## 4. V4L2 media topology auditor
-
-[`tools/v4l2_topology_audit.py`](tools/v4l2_topology_audit.py) parses the useful
-subset of `media-ctl -p` output and reports:
-
-- entities with no enabled outgoing link;
-- enabled links with conflicting source/sink formats;
-- immutable links;
-- a concise entity/link summary;
-- machine-readable JSON output for CI or BSP smoke tests.
-
-Two synthetic RKISP-style examples are included:
-
-- [`examples/media-ctl-rkisp-good.txt`](examples/media-ctl-rkisp-good.txt)
-- [`examples/media-ctl-rkisp-broken.txt`](examples/media-ctl-rkisp-broken.txt)
-
-The parser is intentionally tolerant because media-ctl output varies across
-kernel and driver versions. Unknown lines are preserved as ignored input
-rather than treated as proof of a healthy pipeline.
-
-## 5. A/B firmware upgrade simulator
-
-[`tools/firmware_ab_simulator.py`](tools/firmware_ab_simulator.py) models:
-
-1. package integrity validation;
-2. chunked writes to the inactive slot;
-3. read-back verification;
-4. pending-slot selection;
-5. trial boot;
-6. confirmation or rollback.
-
-It can inject power loss after a selected write chunk:
-
-```bash
-python tools/firmware_ab_simulator.py demo --fail-after-chunk 2
-```
-
-The simulator is not production bootloader code. Its purpose is to make
-upgrade-state transitions and failure-handling rules explicit before they are
-implemented against a real SPI NOR/NAND or eMMC backend.
+[`tools/firmware_ab_simulator.py`](tools/firmware_ab_simulator.py) models
+package validation, inactive-slot writes, read-back verification, pending-slot
+selection, trial boot, confirmation, power loss and rollback.
 
 ## Client-style deliverable
 
-Raw logs are rarely enough. Use
-[`templates/diagnostic-report.md`](templates/diagnostic-report.md) to summarize
-the symptom, evidence, earliest proven failure, recommended fix, risks, and
-verification plan.
+Use [`templates/diagnostic-report.md`](templates/diagnostic-report.md) to turn
+raw evidence into a concise symptom, root-cause, fix and verification report.
 
 ## Repository layout
 
 ```text
 .
+├── demos/
+│   ├── android-camera2-jni-app/
+│   ├── driver-v4l2-sensor/
+│   └── hal3-camera-pipeline/
 ├── examples/
 ├── scripts/
-│   └── collect_uvc_diagnostics.sh
 ├── templates/
-│   └── diagnostic-report.md
 ├── tests/
 └── tools/
-    ├── firmware_ab_simulator.py
-    ├── redact_diagnostics.py
-    ├── uvc_bandwidth.py
-    └── v4l2_topology_audit.py
 ```
 
 ## Confidentiality
 
 The repository contains no customer source code, firmware image, schematic,
-register table, product identifier, or captured commercial-device log. Review
+register table, product identifier or captured commercial-device log. Review
 and anonymize every artifact before publishing it.
 
 ## License
 
 Add an MIT or Apache-2.0 license only after confirming that all files are your
 own work and may be published.
-
